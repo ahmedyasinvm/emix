@@ -1,0 +1,63 @@
+
+> Configure project :app
+WARNING: The option setting 'android.usesSdkInManifest.disallowed=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.sdk.defaultTargetSdkToCompileSdkIfUnset=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.enableAppCompileTimeRClass=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.builtInKotlin=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.newDsl=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.r8.optimizedResourceShrinking=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.defaults.buildfeatures.resvalues=true' is deprecated.
+The current default is 'false'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.enableJetifier=true' is deprecated.
+The current default is 'false'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+
+> Task :app:signingReport
+Variant: debug
+Config: debug
+Store: C:\Users\ahmed\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 68:F7:AD:B9:6F:97:89:26:EF:C1:D9:DA:49:C6:CF:11
+SHA1: 2D:65:6F:87:52:45:2A:EB:75:12:D8:A5:13:B7:1B:FA:63:E9:6C:4D
+SHA-256: B8:06:51:1E:B7:D2:4A:CB:28:BD:CF:21:47:3F:11:EF:49:13:0C:56:66:CB:11:BB:0A:7B:A7:A8:29:E8:AE:72
+Valid until: Tuesday, 8 February, 2056
+----------
+Variant: release
+Config: null
+Store: null
+Alias: null
+----------
+Variant: debugAndroidTest
+Config: debug
+Store: C:\Users\ahmed\.android\debug.keystore
+Alias: AndroidDebugKey
+MD5: 68:F7:AD:B9:6F:97:89:26:EF:C1:D9:DA:49:C6:CF:11
+SHA1: 2D:65:6F:87:52:45:2A:EB:75:12:D8:A5:13:B7:1B:FA:63:E9:6C:4D
+SHA-256: B8:06:51:1E:B7:D2:4A:CB:28:BD:CF:21:47:3F:11:EF:49:13:0C:56:66:CB:11:BB:0A:7B:A7:A8:29:E8:AE:72
+Valid until: Tuesday, 8 February, 2056
+----------
+
+BUILD SUCCESSFUL in 5s
+1 actionable task: 1 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.2.1/userguide/configuration_cache_enabling.html

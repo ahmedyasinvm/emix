@@ -1,0 +1,24 @@
+
+# Gradle
+.gradle/
+build/
+app/build/
+
+# Local configuration file (sdk.path, etc)
+local.properties
+
+# IntelliJ
+.idea/workspace.xml
+.idea/libraries
+.idea/caches
+*.iml
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# macOS
+.DS_Store
+
+# Misc
+.gemini/
+.antigravity/
