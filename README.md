@@ -46,7 +46,7 @@ This project demonstrates modern Android development practices:
 
 ## 📥 Download
 
-Get the latest APK from the [Releases Page](https://github.com/YOUR_USERNAME/emix/releases).
+Get the latest APK from the [Releases Page](https://github.com/ahmedyasinvm/emix/releases).
 
 ---
 
