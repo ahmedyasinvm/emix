@@ -30,6 +30,9 @@ interface CustomerDao {
     @Query("SELECT * FROM customers")
     fun getAllCustomers(): Flow<List<Customer>>
 
+    @Query("SELECT COUNT(*) FROM customers")
+    suspend fun getCustomerCount(): Int
+
     @Query("""
         SELECT c.*, 
                SUM(l.currentBalance) as totalRemainingDebt, 

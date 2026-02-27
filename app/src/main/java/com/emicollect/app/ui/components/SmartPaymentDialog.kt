@@ -3,8 +3,7 @@ package com.emicollect.app.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,17 +20,44 @@ import com.emicollect.app.ui.theme.TextWhite
 fun SmartPaymentDialog(
     defaultAmount: Double,
     currentBalance: Double,
+    initialDate: Long = System.currentTimeMillis(),
+    initialMode: String = "Cash",
+    isEdit: Boolean = false,
     onDismiss: () -> Unit,
-    onConfirm: (Double, String) -> Unit
+    onConfirm: (Double, String, Long) -> Unit
 ) {
     var amount by remember(defaultAmount) { mutableStateOf(if (defaultAmount > 0) defaultAmount.toString() else "") }
-    var paymentMode by remember { mutableStateOf("Cash") }
+    var paymentMode by remember { mutableStateOf(initialMode) }
+    var selectedDate by remember { mutableStateOf(initialDate) }
+
+    val parsedAmount = amount.toDoubleOrNull() ?: 0.0
+    val isOverBudget = !isEdit && currentBalance > 0 && parsedAmount > currentBalance
+    
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate)
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { selectedDate = it }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { 
             Text(
-                "Receive Payment", 
+                if (isEdit) "Edit Transaction" else "Receive Payment", 
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = TextWhite
@@ -41,11 +67,34 @@ fun SmartPaymentDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 
-                // Balance Info
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Current Balance", style = MaterialTheme.typography.labelMedium, color = TextWhite.copy(alpha = 0.7f))
-                        Text("₹${String.format("%.2f", currentBalance)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = GoldAccent)
+                // Balance Info (Hide or show differently in edit mode)
+                if (!isEdit) {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Current Balance", style = MaterialTheme.typography.labelMedium, color = TextWhite.copy(alpha = 0.7f))
+                            Text("₹${String.format("%.2f", currentBalance)}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = GoldAccent)
+                        }
+                    }
+                }
+
+                // Date Selection Row
+                OutlinedCard(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.outlinedCardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Payment Date", style = MaterialTheme.typography.labelSmall, color = TextWhite.copy(alpha = 0.7f))
+                            val dateStr = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(selectedDate))
+                            Text(dateStr, style = MaterialTheme.typography.bodyLarge, color = TextWhite)
+                        }
+                        Icon(Icons.Default.Event, contentDescription = "Change Date", tint = GoldAccent)
                     }
                 }
 
@@ -95,6 +144,22 @@ fun SmartPaymentDialog(
                     }
                 }
 
+                // Over-budget warning
+                if (isOverBudget) {
+                    Surface(
+                        color = GoldAccent.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "Amount exceeds balance (₹${String.format("%.2f", currentBalance)}). Payment will be capped.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = GoldAccent,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
                 // Payment Mode Toggle
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val modes = listOf("Cash", "GPay")
@@ -117,12 +182,16 @@ fun SmartPaymentDialog(
                 onClick = {
                     val a = amount.toDoubleOrNull() ?: 0.0
                     if (a > 0) {
-                        onConfirm(a, paymentMode)
+                        onConfirm(a, paymentMode, selectedDate)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
+                enabled = parsedAmount > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = if (isOverBudget) GoldAccent else EmeraldPrimary)
             ) {
-                Text("Confirm Payment", color = TextWhite)
+                Text(
+                    if (isOverBudget) "Confirm (Capped)" else "Confirm Payment",
+                    color = if (isOverBudget) MaterialTheme.colorScheme.onSecondary else TextWhite
+                )
             }
         },
         dismissButton = {

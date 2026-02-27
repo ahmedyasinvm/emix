@@ -11,5 +11,7 @@ data class Customer(
     val phone: String,
     val address: String,
     val frequency: String = "Weekly",
+    val collectionDay: Int = 1, // 1=Sun, 7=Sat
+    val collectionWeek: Int = 1, // 1-4
     val createdAt: Long = System.currentTimeMillis()
 )

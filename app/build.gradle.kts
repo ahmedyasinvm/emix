@@ -13,10 +13,10 @@ android {
 
     defaultConfig {
         applicationId = "com.emicollect.app"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 6
+        versionName = "3.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -62,11 +62,13 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.biometric)
     implementation(libs.gson)
-    implementation(libs.play.services.auth)
-    implementation(libs.google.api.client.android)
-    implementation(libs.google.api.services.drive)
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.api-client:google-api-client-android:1.26.0")
+    implementation("com.google.apis:google-api-services-drive:v3-rev136-1.25.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("com.google.http-client:google-http-client-android:1.42.0")
+    implementation("com.google.http-client:google-http-client-gson:1.42.0")
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
@@ -82,6 +84,12 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+
+    // MPAndroidChart
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    // Apache POI (Excel Export)
+    implementation("org.apache.poi:poi-ooxml:5.2.3")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -30,6 +30,7 @@ data class Loan(
     val downPayment: Double,
     val currentBalance: Double,
     val emiFrequency: EmiFrequency,
+    val startDate: Long = System.currentTimeMillis(),
     val nextDueDate: Long,
     val isClosed: Boolean = false
 )

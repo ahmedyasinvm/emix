@@ -8,6 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
 import com.emicollect.app.ui.theme.EmeraldPrimary
 import com.emicollect.app.ui.theme.TextWhite
 
@@ -15,11 +18,32 @@ import com.emicollect.app.ui.theme.TextWhite
 @Composable
 fun AddLoanDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, Double, Double) -> Unit
+    onConfirm: (String, Double, Double, Long, String) -> Unit
 ) {
     var itemName by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
     var downPayment by remember { mutableStateOf("") }
+    var selectedDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var paymentMode by remember { mutableStateOf("Cash") }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDate)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { selectedDate = it }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -49,6 +73,25 @@ fun AddLoanDialog(
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
+                
+                OutlinedCard(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.outlinedCardColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Start Date", style = MaterialTheme.typography.labelSmall, color = TextWhite.copy(alpha = 0.7f))
+                            val dateStr = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(selectedDate))
+                            Text(dateStr, style = MaterialTheme.typography.bodyLarge, color = TextWhite)
+                        }
+                        Icon(Icons.Default.DateRange, contentDescription = "Select Date", tint = com.emicollect.app.ui.theme.GoldAccent)
+                    }
+                }
+
                 OutlinedTextField(
                     value = price,
                     onValueChange = { price = it },
@@ -81,6 +124,28 @@ fun AddLoanDialog(
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
+
+                // Payment Mode Toggle
+                Text("Down Payment Mode", style = MaterialTheme.typography.labelMedium, color = TextWhite.copy(alpha = 0.7f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    listOf("Cash", "GPay").forEach { mode ->
+                        FilterChip(
+                            selected = paymentMode == mode,
+                            onClick = { paymentMode = mode },
+                            label = { Text(mode, fontWeight = if (paymentMode == mode) FontWeight.Bold else FontWeight.Normal) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EmeraldPrimary,
+                                selectedLabelColor = TextWhite,
+                                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                labelColor = TextWhite.copy(alpha = 0.7f)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -89,7 +154,7 @@ fun AddLoanDialog(
                     val p = price.toDoubleOrNull() ?: 0.0
                     val d = downPayment.toDoubleOrNull() ?: 0.0
                     if (itemName.isNotBlank() && p > 0) {
-                        onConfirm(itemName, p, d)
+                        onConfirm(itemName, p, d, selectedDate, paymentMode)
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)

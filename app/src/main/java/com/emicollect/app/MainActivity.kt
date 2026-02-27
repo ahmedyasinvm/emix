@@ -2,95 +2,95 @@ package com.emicollect.app
 
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.emicollect.app.data.local.UserPreferencesRepository
 import com.emicollect.app.ui.addcustomer.AddCustomerScreen
 import com.emicollect.app.ui.details.CustomerDetailScreen
-import com.emicollect.app.ui.home.DashboardScreen
 import com.emicollect.app.ui.theme.EMICollectAppTheme
+import com.emicollect.app.ui.theme.EmeraldPrimary
+import com.emicollect.app.ui.theme.GoldAccent
+import com.emicollect.app.ui.theme.TextWhite
 import dagger.hilt.android.AndroidEntryPoint
-import java.util.concurrent.Executor
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
-    private lateinit var executor: Executor
-    private lateinit var biometricPrompt: BiometricPrompt
-    private lateinit var promptInfo: BiometricPrompt.PromptInfo
-    
-    private val googleSignInLauncher = registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-            // Login successful, proceed to biometric
-            startBiometricAuth()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Google Sign-In failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-            finish()
-        }
-    }
+
+    @Inject
+    lateinit var userPreferencesRepository: UserPreferencesRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        executor = ContextCompat.getMainExecutor(this)
-        
-        // Skip mandatory Google Sign-In — go straight to biometric auth
-        // Google Sign-In can be triggered later from settings for cloud sync
-        startBiometricAuth()
-    }
-    
-    private fun startGoogleSignIn() {
-        val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
-            com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
-        )
-        .requestEmail()
-        .requestScopes(com.google.android.gms.common.api.Scope(com.google.api.services.drive.DriveScopes.DRIVE_APPDATA))
-        .build()
-        
-        val client = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(this, gso)
-        googleSignInLauncher.launch(client.signInIntent)
+
+        // Show a loading/splash screen immediately while we read the preference
+        showLockScreen()
+
+
+
+        lifecycleScope.launch {
+            val isBiometricEnabled = userPreferencesRepository.isBiometricEnabled.first()
+
+            if (!isBiometricEnabled) {
+                // Biometric NOT enabled — go straight to app
+                showAppContent()
+            } else {
+                // Biometric IS enabled — check hardware, then prompt
+                runOnUiThread { startBiometricAuth() }
+            }
+        }
     }
 
     private fun startBiometricAuth() {
-        // Check if biometric is available
-        val biometricManager = androidx.biometric.BiometricManager.from(this)
+        val biometricManager = BiometricManager.from(this)
         val canAuthenticate = biometricManager.canAuthenticate(
-            androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
-            androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.BIOMETRIC_WEAK
         )
-        
-        if (canAuthenticate != androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS) {
-            // Biometric not available or not enrolled — skip to app
+
+        if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
+            // Hardware not available or no fingerprint enrolled — let them in
             showAppContent()
             return
         }
-        
-        promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Biometric Authentication")
-            .setSubtitle("Log in using your biometric credential")
+
+        val executor = ContextCompat.getMainExecutor(this)
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock Emix")
+            .setSubtitle("Verify your identity to continue")
             .setNegativeButtonText("Cancel")
             .build()
-            
-        biometricPrompt = BiometricPrompt(this, executor,
+
+        val biometricPrompt = BiometricPrompt(this, executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    // On error or cancel, still show app content
-                    showAppContent()
+                    // User tapped "Cancel" or too many attempts → close app
+                    Toast.makeText(this@MainActivity, "Authentication cancelled", Toast.LENGTH_SHORT).show()
+                    finish()
                 }
 
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -100,18 +100,52 @@ class MainActivity : FragmentActivity() {
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    Toast.makeText(this@MainActivity, "Authentication failed", Toast.LENGTH_SHORT).show()
+                    // Single bad attempt — prompt stays open, just toast
+                    Toast.makeText(this@MainActivity, "Fingerprint not recognised", Toast.LENGTH_SHORT).show()
                 }
             })
-        
-        // Prompt immediately
+
         biometricPrompt.authenticate(promptInfo)
     }
 
+    /** Temporary lock/splash screen — shown until biometric check completes */
+    private fun showLockScreen() {
+        setContent {
+            // Default to dark for splash
+            EMICollectAppTheme(useDarkTheme = true) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "EMIX",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = GoldAccent
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "EMI Collection Manager",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextWhite.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(32.dp))
+                        CircularProgressIndicator(color = EmeraldPrimary, modifier = Modifier.size(32.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    /** Main app content — only shown after authentication passes */
     private fun showAppContent() {
         setContent {
-            EMICollectAppTheme {
-                // A surface container using the 'background' color from the theme
+            val isDarkMode by userPreferencesRepository.isDarkMode.collectAsState(initial = true)
+            
+            EMICollectAppTheme(useDarkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

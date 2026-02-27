@@ -162,6 +162,95 @@ fun AddCustomerScreen(
                             }
                         }
                     }
+
+                    // Schedule Customization
+                    val days = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+                    val weeks = listOf("1st Week", "2nd Week", "3rd Week", "4th Week")
+                    var dayExpanded by remember { mutableStateOf(false) }
+                    var weekExpanded by remember { mutableStateOf(false) }
+
+                    Divider(color = TextWhite.copy(alpha = 0.1f))
+                    Text("Collection Schedule", style = MaterialTheme.typography.labelMedium, color = GoldAccent)
+
+                    // Day Selection (Always relevant for Weekly/Monthly)
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = days[(state.collectionDay - 1).coerceIn(0, 6)],
+                            onValueChange = { },
+                            label = { Text("Collection Day") },
+                            modifier = Modifier.fillMaxWidth(),
+                            readOnly = true,
+                            trailingIcon = {
+                                IconButton(onClick = { dayExpanded = true }) {
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Select Day", tint = TextWhite)
+                                }
+                            },
+                             colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextWhite,
+                                unfocusedTextColor = TextWhite,
+                                focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                focusedBorderColor = EmeraldPrimary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+                        DropdownMenu(
+                            expanded = dayExpanded,
+                            onDismissRequest = { dayExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            days.forEachIndexed { index, day ->
+                                DropdownMenuItem(
+                                    text = { Text(day, color = TextWhite) },
+                                    onClick = {
+                                        viewModel.onCollectionDayChange(index + 1)
+                                        dayExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Week Selection (Only for Monthly)
+                    if (state.frequency == "Monthly") {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = weeks[(state.collectionWeek - 1).coerceIn(0, 3)],
+                                onValueChange = { },
+                                label = { Text("Collection Week") },
+                                modifier = Modifier.fillMaxWidth(),
+                                readOnly = true,
+                                trailingIcon = {
+                                    IconButton(onClick = { weekExpanded = true }) {
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Select Week", tint = TextWhite)
+                                    }
+                                },
+                                 colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TextWhite,
+                                    unfocusedTextColor = TextWhite,
+                                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    focusedBorderColor = EmeraldPrimary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
+                            )
+                            DropdownMenu(
+                                expanded = weekExpanded,
+                                onDismissRequest = { weekExpanded = false },
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                            ) {
+                                weeks.forEachIndexed { index, week ->
+                                    DropdownMenuItem(
+                                        text = { Text(week, color = TextWhite) },
+                                        onClick = {
+                                            viewModel.onCollectionWeekChange(index + 1)
+                                            weekExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

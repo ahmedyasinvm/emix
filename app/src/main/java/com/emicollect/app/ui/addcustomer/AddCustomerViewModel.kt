@@ -17,6 +17,8 @@ data class AddCustomerUiState(
     val phone: String = "",
     val address: String = "",
     val frequency: String = "Weekly",
+    val collectionDay: Int = 1, // 1=Sun, 2=Mon...
+    val collectionWeek: Int = 1, // 1st, 2nd, 3rd, 4th
     val isLoading: Boolean = false,
     val error: String? = null,
     val isSaved: Boolean = false
@@ -46,6 +48,14 @@ class AddCustomerViewModel @Inject constructor(
         _uiState.update { it.copy(frequency = frequency, error = null) }
     }
 
+    fun onCollectionDayChange(day: Int) {
+        _uiState.update { it.copy(collectionDay = day) }
+    }
+
+    fun onCollectionWeekChange(week: Int) {
+        _uiState.update { it.copy(collectionWeek = week) }
+    }
+
     fun saveCustomer() {
         val currentState = _uiState.value
         
@@ -67,7 +77,9 @@ class AddCustomerViewModel @Inject constructor(
                         name = currentState.name,
                         phone = currentState.phone,
                         address = currentState.address,
-                        frequency = currentState.frequency
+                        frequency = currentState.frequency,
+                        collectionDay = currentState.collectionDay,
+                        collectionWeek = currentState.collectionWeek
                     )
                 )
                 _uiState.update { it.copy(isLoading = false, isSaved = true) }

@@ -13,6 +13,9 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction)
 
+    @androidx.room.Update
+    suspend fun updateTransaction(transaction: Transaction)
+
     @Delete
     suspend fun deleteTransaction(transaction: Transaction)
 
@@ -30,4 +33,7 @@ interface TransactionDao {
 
     @Query("SELECT SUM(amountPaid) FROM transactions")
     fun getTotalCollection(): Flow<Double?>
+
+    @Query("SELECT t.* FROM transactions t INNER JOIN loans l ON t.loanId = l.loanId WHERE l.customerId = :customerId ORDER BY t.datePaid DESC")
+    fun getTransactionsForCustomer(customerId: Long): Flow<List<Transaction>>
 }

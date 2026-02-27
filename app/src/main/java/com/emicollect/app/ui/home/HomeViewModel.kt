@@ -1,17 +1,34 @@
 package com.emicollect.app.ui.home
 
+import android.content.ContentValues
+import android.content.Context
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.emicollect.app.data.repository.CollectionRepository
+import com.emicollect.app.data.drive.DriveServiceHelper
 import com.emicollect.app.data.local.UserPreferencesRepository
 import com.emicollect.app.data.model.CustomerWithDebtStatus
 import com.emicollect.app.data.model.SortOption
+import com.emicollect.app.data.repository.BackupRepository
+import com.emicollect.app.data.repository.CollectionRepository
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import java.io.File
 import javax.inject.Inject
+
+// ─── UI Event sealed class (replaces Toast calls) ───────────────────────────
+sealed class HomeUiEvent {
+    data class ShowMessage(val message: String) : HomeUiEvent()
+    object RestartRequired : HomeUiEvent()
+}
 
 data class HomeUiState(
     val customers: List<CustomerWithDebtStatus> = emptyList(),
@@ -19,109 +36,28 @@ data class HomeUiState(
     val sortOption: SortOption = SortOption.URGENT,
     val totalCollectionToday: Double = 0.0,
     val searchQuery: String = "",
-    val isSearchActive: Boolean = false
+    val isSearchActive: Boolean = false,
+    /** True when: local DB is empty + cloud backup found after sign-in */
+    val showRestorePrompt: Boolean = false,
+    /** True while "Today's Due" filter is active */
+    val showTodaysDueOnly: Boolean = false
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: CollectionRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val backupRepository: com.emicollect.app.data.repository.BackupRepository,
-    private val googleDriveManager: com.emicollect.app.data.cloud.GoogleDriveManager
+    private val backupRepository: BackupRepository,
+    private val driveServiceHelper: DriveServiceHelper
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-    
+
+    private val _uiEvent = MutableSharedFlow<HomeUiEvent>()
+    val uiEvent: SharedFlow<HomeUiEvent> = _uiEvent.asSharedFlow()
+
     val isWhatsAppEnabled = userPreferencesRepository.isWhatsAppEnabled
-    
-    fun performBackup(context: android.content.Context) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            try {
-                val json = backupRepository.createBackupJson()
-                saveBackupToFile(context, json)
-                
-                // Also Sync to Cloud
-                syncToCloud(context, json)
-                
-                 android.widget.Toast.makeText(context, "Backup saved to Downloads & Cloud", android.widget.Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                 android.widget.Toast.makeText(context, "Backup failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-            } finally {
-                _uiState.update { it.copy(isLoading = false) }
-            }
-        }
-    }
-    
-    private suspend fun syncToCloud(context: android.content.Context, json: String) {
-        val account = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
-        if (account != null) {
-            try {
-                googleDriveManager.syncToCloud(context, account, json)
-            } catch (e: Exception) {
-                // Log or toast error silently for cloud sync
-            }
-        }
-    }
-    
-    fun restoreFromCloud(context: android.content.Context) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            try {
-                val account = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
-                if (account == null) {
-                    android.widget.Toast.makeText(context, "Not signed in to Google", android.widget.Toast.LENGTH_LONG).show()
-                    _uiState.update { it.copy(isLoading = false) }
-                    return@launch
-                }
-                
-                val json = googleDriveManager.fetchLatestCloudBackup(context, account)
-                if (json != null) {
-                    backupRepository.restoreBackup(json)
-                    // Reload data
-                    setupCustomerFlow()
-                    loadCollectionStats()
-                    android.widget.Toast.makeText(context, "Restored from Cloud successfully", android.widget.Toast.LENGTH_LONG).show()
-                } else {
-                    android.widget.Toast.makeText(context, "No backup found in Cloud", android.widget.Toast.LENGTH_LONG).show()
-                }
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "Restore failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-            } finally {
-                _uiState.update { it.copy(isLoading = false) }
-            }
-        }
-    }
-
-    private fun saveBackupToFile(context: android.content.Context, json: String) {
-        val fileName = "emi_backup_${System.currentTimeMillis()}.json"
-        
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            val contentValues = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
-            }
-            val resolver = context.contentResolver
-            val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-            uri?.let {
-                resolver.openOutputStream(it)?.use { stream ->
-                    stream.write(json.toByteArray())
-                }
-            }
-        } else {
-            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-            val file = java.io.File(downloadsDir, fileName)
-            file.writeText(json)
-        }
-    }
-
-    fun setWhatsAppEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            userPreferencesRepository.setWhatsAppEnabled(enabled)
-        }
-    }
 
     // Separate flow for search query to handle debounce
     private val searchQuery = MutableStateFlow("")
@@ -130,6 +66,130 @@ class HomeViewModel @Inject constructor(
         loadCollectionStats()
         setupCustomerFlow()
     }
+
+    // ─── Backup / Restore ────────────────────────────────────────────────────
+
+    fun performBackup(context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val json = backupRepository.createBackupJson()
+                saveBackupToDownloads(context, json)
+                syncToCloud(context, json)
+                _uiEvent.emit(HomeUiEvent.ShowMessage("Backup successfully saved to Downloads and Google Drive."))
+            } catch (e: Exception) {
+                _uiEvent.emit(HomeUiEvent.ShowMessage("Backup failed: ${e.message}"))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    private suspend fun syncToCloud(context: Context, json: String) {
+        val account = GoogleSignIn.getLastSignedInAccount(context)
+        if (account != null) {
+            try {
+                driveServiceHelper.uploadDatabase(context, account)
+            } catch (e: Exception) {
+                // Cloud sync failure is non-fatal; local backup already succeeded.
+            }
+        }
+    }
+
+    fun restoreFromCloud(context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val account = GoogleSignIn.getLastSignedInAccount(context)
+                if (account == null) {
+                    _uiEvent.emit(HomeUiEvent.ShowMessage("Google account not signed in. Please sign in via Settings."))
+                    _uiState.update { it.copy(isLoading = false) }
+                    return@launch
+                }
+
+                val backups = driveServiceHelper.listBackups(context, account)
+                if (backups.isEmpty()) {
+                    _uiEvent.emit(HomeUiEvent.ShowMessage("No backup found on Google Drive."))
+                } else {
+                    driveServiceHelper.downloadBackup(context, account, backups.first().id)
+                    _uiEvent.emit(HomeUiEvent.RestartRequired)
+                }
+            } catch (e: Exception) {
+                _uiEvent.emit(HomeUiEvent.ShowMessage("Restore failed: ${e.message}"))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    private suspend fun saveBackupToDownloads(context: Context, json: String) {
+        val fileName = "emi_backup_${System.currentTimeMillis()}.json"
+        withContext(Dispatchers.IO) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                val resolver = context.contentResolver
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                uri?.let {
+                    resolver.openOutputStream(it)?.use { stream -> stream.write(json.toByteArray()) }
+                }
+            } else {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                File(downloadsDir, fileName).writeText(json)
+            }
+        }
+    }
+
+    // ─── Restore-First Safety Protocol ───────────────────────────────────────
+
+    /**
+     * Called after Google Sign-In. Checks if local DB is empty and a cloud backup exists.
+     * If so, prompts the user to restore instead of starting fresh.
+     */
+    fun checkRestoreFirstCondition(context: Context) {
+        viewModelScope.launch {
+            try {
+                val account = GoogleSignIn.getLastSignedInAccount(context) ?: return@launch
+                val customerCount = repository.getCustomerCount()
+                if (customerCount > 0) return@launch // Local data present — no need to prompt
+
+                val backupExists = driveServiceHelper.checkForExistingBackup(context, account)
+                if (backupExists) {
+                    _uiState.update { it.copy(showRestorePrompt = true) }
+                }
+            } catch (e: Exception) {
+                // Non-critical — silently ignore
+            }
+        }
+    }
+
+    fun dismissRestorePrompt() {
+        _uiState.update { it.copy(showRestorePrompt = false) }
+    }
+
+    fun acceptRestoreFromCloud(context: Context) {
+        _uiState.update { it.copy(showRestorePrompt = false) }
+        restoreFromCloud(context)
+    }
+
+    // ─── Today's Due Filter ───────────────────────────────────────────────────
+
+    fun toggleTodaysDueFilter() {
+        _uiState.update { it.copy(showTodaysDueOnly = !it.showTodaysDueOnly) }
+    }
+
+    // ─── Settings ────────────────────────────────────────────────────────────
+
+    fun setWhatsAppEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setWhatsAppEnabled(enabled)
+        }
+    }
+
+    // ─── Customer Flow ────────────────────────────────────────────────────────
 
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     private fun setupCustomerFlow() {
@@ -171,12 +231,9 @@ class HomeViewModel @Inject constructor(
     }
 
     fun toggleSearch() {
-        _uiState.update { 
+        _uiState.update {
             val newActive = !it.isSearchActive
-            if (!newActive) {
-                // Clear query when closing search
-                onSearchQueryChange("")
-            }
+            if (!newActive) onSearchQueryChange("")
             it.copy(isSearchActive = newActive)
         }
     }

@@ -24,20 +24,36 @@ private val PremiumScheme = darkColorScheme(
     onError = TextWhite
 )
 
+private val LightScheme = androidx.compose.material3.lightColorScheme(
+    primary = EmeraldPrimary,
+    onPrimary = TextWhite,
+    primaryContainer = EmeraldLight,
+    onPrimaryContainer = GunmetalDark,
+    secondary = GoldAccent,
+    onSecondary = GunmetalDark,
+    background = androidx.compose.ui.graphics.Color(0xFFF1F5F9), // Slate 100
+    onBackground = GunmetalDark,
+    surface = androidx.compose.ui.graphics.Color.White,
+    onSurface = GunmetalDark,
+    error = ErrorRed,
+    onError = TextWhite
+)
+
 @Composable
 fun EMICollectAppTheme(
+    useDarkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = PremiumScheme
+    val colorScheme = if (useDarkTheme) PremiumScheme else LightScheme
     val view = LocalView.current
     
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Status bar matches the dark background
-            window.statusBarColor = GunmetalDark.toArgb()
-            // Ensure icons are light (for dark background)
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            // Status bar matches the background
+            window.statusBarColor = colorScheme.background.toArgb()
+            // Icons are light if background is dark, dark if background is light
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDarkTheme
         }
     }
 

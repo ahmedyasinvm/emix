@@ -19,6 +19,7 @@ class CollectionRepositoryImpl @Inject constructor(
 ) : CollectionRepository {
 
     // Customer operations
+    override suspend fun getCustomerCount(): Int = customerDao.getCustomerCount()
     override suspend fun insertCustomer(customer: Customer): Long = customerDao.insertCustomer(customer)
     override suspend fun addCustomer(customer: Customer) { customerDao.insertCustomer(customer) }
     override suspend fun updateCustomer(customer: Customer) = customerDao.updateCustomer(customer)
@@ -44,7 +45,8 @@ class CollectionRepositoryImpl @Inject constructor(
     override suspend fun deleteLoan(loan: Loan) = loanDao.deleteLoan(loan)
     override suspend fun getLoanById(loanId: Long): Loan? = loanDao.getLoanById(loanId)
     override fun getLoansForCustomer(customerId: Long): Flow<List<Loan>> = loanDao.getLoansForCustomer(customerId)
-    override suspend fun payInstallment(loanId: Long, amount: Double) {
+    override fun getAllLoans(): Flow<List<Loan>> = loanDao.getAllLoans()
+    override suspend fun payInstallment(loanId: Long, amount: Double, paymentMode: String) {
         val loan = loanDao.getLoanById(loanId) ?: throw IllegalArgumentException("Loan not found")
 
         if (amount > loan.currentBalance) {
@@ -72,6 +74,7 @@ class CollectionRepositoryImpl @Inject constructor(
         val transaction = com.emicollect.app.data.local.entity.Transaction(
             loanId = loanId,
             amountPaid = amount,
+            paymentMode = paymentMode,
             datePaid = System.currentTimeMillis()
         )
         transactionDao.insertTransaction(transaction)
@@ -79,8 +82,13 @@ class CollectionRepositoryImpl @Inject constructor(
 
     // Transaction operations
     override suspend fun insertTransaction(transaction: Transaction) = transactionDao.insertTransaction(transaction)
+    override suspend fun updateTransaction(transaction: Transaction) = transactionDao.updateTransaction(transaction)
     override suspend fun deleteTransaction(transaction: Transaction) = transactionDao.deleteTransaction(transaction)
     override fun getTransactionsForLoan(loanId: Long): Flow<List<Transaction>> = transactionDao.getTransactionsForLoan(loanId)
+
+    override fun getTransactionsForCustomer(customerId: Long): Flow<List<Transaction>> = transactionDao.getTransactionsForCustomer(customerId)
+
+    override fun getAllTransactions(): Flow<List<Transaction>> = transactionDao.getAllTransactions()
 
     override fun getCollectedToday(): Flow<Double> {
         val calendar = java.util.Calendar.getInstance()

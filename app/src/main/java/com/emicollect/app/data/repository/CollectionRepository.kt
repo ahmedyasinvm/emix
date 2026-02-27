@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface CollectionRepository {
     // Customer operations
+    suspend fun getCustomerCount(): Int
     suspend fun insertCustomer(customer: Customer): Long
     suspend fun addCustomer(customer: Customer)
     suspend fun updateCustomer(customer: Customer)
@@ -25,12 +26,16 @@ interface CollectionRepository {
     suspend fun deleteLoan(loan: Loan)
     suspend fun getLoanById(loanId: Long): Loan?
     fun getLoansForCustomer(customerId: Long): Flow<List<Loan>>
-    suspend fun payInstallment(loanId: Long, amount: Double)
+    fun getAllLoans(): Flow<List<Loan>>
+    suspend fun payInstallment(loanId: Long, amount: Double, paymentMode: String = "Cash")
 
     // Transaction operations
     suspend fun insertTransaction(transaction: Transaction)
+    suspend fun updateTransaction(transaction: Transaction)
     suspend fun deleteTransaction(transaction: Transaction)
     fun getTransactionsForLoan(loanId: Long): Flow<List<Transaction>>
+    fun getTransactionsForCustomer(customerId: Long): Flow<List<Transaction>>
+    fun getAllTransactions(): Flow<List<Transaction>>
     fun getCollectedToday(): Flow<Double>
     fun getTotalCollection(): Flow<Double>
     fun countOverdueLoans(timestamp: Long): Flow<Int>

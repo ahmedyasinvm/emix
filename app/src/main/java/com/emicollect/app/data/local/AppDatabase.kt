@@ -12,7 +12,7 @@ import com.emicollect.app.data.local.entity.Transaction
 
 @Database(
     entities = [Customer::class, Loan::class, Transaction::class],
-    version = 2,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -20,4 +20,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun customerDao(): CustomerDao
     abstract fun loanDao(): LoanDao
     abstract fun transactionDao(): TransactionDao
+
+    companion object {
+        const val DATABASE_NAME = "emix_app_db"
+    }
 }

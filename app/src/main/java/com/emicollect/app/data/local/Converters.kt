@@ -24,4 +24,14 @@ class Converters {
     fun emiFrequencyToString(frequency: EmiFrequency?): String? {
         return frequency?.name
     }
+
+    @TypeConverter
+    fun fromTransactionType(value: String?): com.emicollect.app.data.local.entity.TransactionType? {
+        return value?.let { com.emicollect.app.data.local.entity.TransactionType.valueOf(it) }
+    }
+
+    @TypeConverter
+    fun transactionTypeToString(type: com.emicollect.app.data.local.entity.TransactionType?): String? {
+        return type?.name
+    }
 }

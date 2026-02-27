@@ -10,3 +10,4 @@ val GunmetalLight = Color(0xFF1F2937)  // Card background
 val TextWhite = Color(0xFFF9FAFB)
 val TextGold = Color(0xFFFBBF24)
 val ErrorRed = Color(0xFFEF4444)
+val InfoBlue = Color(0xFF3B82F6)

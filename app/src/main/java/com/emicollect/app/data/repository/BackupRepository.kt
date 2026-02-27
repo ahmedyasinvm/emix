@@ -44,4 +44,10 @@ class BackupRepository @Inject constructor(
             backupData.transactions.forEach { transactionDao.insertTransaction(it) }
         }
     }
+
+    fun confirmDatabaseCheckpoint() {
+        // Force WAL checkpoint to ensure data is flushed to disk
+        val query = androidx.sqlite.db.SimpleSQLiteQuery("pragma wal_checkpoint(full)")
+        database.query(query).close()
+    }
 }
