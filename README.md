@@ -53,5 +53,5 @@ Get the latest APK from the [Releases Page](https://github.com/ahmedyasinvm/emix
 ## 👤 Author
 
 Developed by **[Ahmed Yasin]**
-* **GitHub:** [github.com/YourUsername](https://github.com/ahmedyasinvm)
+* **GitHub:** [github.com/ahmedyasinvm](https://github.com/ahmedyasinvm)
 * **Site:** [ahmedyasin](ahmedyasinvm.site)
