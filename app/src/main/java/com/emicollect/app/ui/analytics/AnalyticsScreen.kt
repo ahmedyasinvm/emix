@@ -1,25 +1,14 @@
 package com.emicollect.app.ui.analytics
 
-import android.graphics.Color as AColor
-import android.graphics.Typeface
-import android.view.ViewGroup
-import android.widget.LinearLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,344 +16,338 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.emicollect.app.ui.theme.EmeraldLight
-import com.emicollect.app.ui.theme.EmeraldPrimary
-import com.emicollect.app.ui.theme.GoldAccent
-import com.emicollect.app.ui.theme.TextWhite
+import com.emicollect.app.ui.components.EmptyStateView
+import com.emicollect.app.ui.components.GlassCard
+import com.emicollect.app.ui.theme.*
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.PieChart
-import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.*
+import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
-import com.github.mikephil.charting.formatter.ValueFormatter
-import com.github.mikephil.charting.highlight.Highlight
-import com.github.mikephil.charting.listener.OnChartValueSelectedListener
+import java.text.SimpleDateFormat
+import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsScreen(
     viewModel: AnalyticsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val selectedRange by viewModel.selectedRange.collectAsState()
+    val customRange by viewModel.customDateRange.collectAsState()
 
-    if (state.isLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = GoldAccent)
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDateRangePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val start = datePickerState.selectedStartDateMillis
+                        val end = datePickerState.selectedEndDateMillis
+                        if (start != null && end != null) {
+                            viewModel.setCustomDateRange(start, end)
+                        }
+                        showDatePicker = false
+                    }
+                ) { Text("Apply", color = EmeraldPrimary, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurface) }
+            },
+            colors = DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            DateRangePicker(
+                state = datePickerState,
+                title = { Text("Select Analytics Period", modifier = Modifier.padding(16.dp)) },
+                modifier = Modifier.fillMaxHeight(0.8f)
+            )
         }
-    } else {
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PieChart,
+                            contentDescription = null,
+                            tint = EmeraldLight,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            "Analytics",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+            )
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
+                .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ─── HEADER ───
-            Text(
-                text = "Analytics",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextWhite
-            )
+            // ─── Date Range Filter ─────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Predefined ranges
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    DateRange.values().forEach { range ->
+                        FilterChip(
+                            selected = selectedRange == range,
+                            onClick = { 
+                                if (range == DateRange.CUSTOM) {
+                                    showDatePicker = true
+                                } else {
+                                    viewModel.setDateRange(range) 
+                                }
+                            },
+                            label = {
+                                Text(
+                                    range.label,
+                                    fontWeight = if (selectedRange == range) FontWeight.Bold else FontWeight.Normal,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = EmeraldPrimary,
+                                selectedLabelColor = TextWhite,
+                                containerColor = Color.Transparent,
+                                labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                borderColor = MaterialTheme.colorScheme.outline,
+                                selectedBorderColor = EmeraldPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                
+                // Show custom range dates if selected
+                if (selectedRange == DateRange.CUSTOM && customRange != null) {
+                    val df = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                    val startStr = df.format(Date(customRange!!.first))
+                    val endStr = df.format(Date(customRange!!.second))
+                    Text(
+                        text = "Viewing: $startStr to $endStr",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = EmeraldLight,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+            }
 
-            // ═══════ KEY STATS CARDS (3 side-by-side) ═══════
+            // ─── Key Stat Cards ────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Today",
-                    value = "₹${String.format("%.0f", state.todayCollected)}",
-                    icon = Icons.Default.CalendarToday,
-                    gradientColors = listOf(
-                        Color(0xFF059669), Color(0xFF10B981)
-                    )
+                AnalyticStatCard(
+                    icon = Icons.Default.AccountBalance,
+                    label = if (selectedRange == DateRange.WEEK) "Total Collected" else "Period Collected",
+                    value = "₹${String.format("%.0f", state.periodCollected)}",
+                    valueColor = EmeraldLight,
+                    modifier = Modifier.weight(1f)
                 )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    label = "This Week",
-                    value = "₹${String.format("%.0f", state.weekCollected)}",
-                    icon = Icons.Default.TrendingUp,
-                    gradientColors = listOf(
-                        Color(0xFF2563EB), Color(0xFF3B82F6)
-                    )
-                )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    label = "Outstanding",
-                    value = "₹${String.format("%.0f", state.totalOutstanding)}",
-                    icon = Icons.Default.AccountBalanceWallet,
-                    gradientColors = listOf(
-                        Color(0xFFDC2626), Color(0xFFEF4444)
-                    )
+                AnalyticStatCard(
+                    icon = Icons.Default.Warning,
+                    label = "Overdue Clients",
+                    value = "${state.overdueCount}",
+                    valueColor = ErrorRed,
+                    modifier = Modifier.weight(1f)
                 )
             }
 
-            // ═══════ DATE RANGE SELECTOR ═══════
-            val rangeOptions = DateRange.values().toList()
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                rangeOptions.forEach { range ->
-                    if (selectedRange == range) {
-                        Button(
-                            onClick = {},
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
-                        ) { Text(range.label, style = MaterialTheme.typography.labelMedium, color = TextWhite) }
-                    } else {
-                        OutlinedButton(onClick = { viewModel.setDateRange(range) }) {
-                            Text(range.label, style = MaterialTheme.typography.labelMedium, color = TextWhite.copy(alpha = 0.7f))
-                        }
+            // ─── Outstanding ───────────────────────────────────────────
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Total Outstanding", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                        Text(
+                            "₹${String.format("%.0f", state.totalOutstanding)}",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = ErrorRed
+                        )
                     }
+                    Icon(Icons.Default.CurrencyRupee, contentDescription = null, tint = ErrorRed.copy(alpha = 0.3f), modifier = Modifier.size(40.dp))
                 }
             }
 
-            // ═══════ COLLECTIONS BAR CHART ═══════
-            val chartSectionTitle = when (selectedRange) {
-                DateRange.WEEK -> "Collections — Last 7 Days"
-                DateRange.DAYS_30 -> "Collections — Last 30 Days (Weekly)"
-                DateRange.DAYS_90 -> "Collections — Last 90 Days (Weekly)"
-            }
-            ChartSection(title = chartSectionTitle) {
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp),
-                    factory = { context ->
-                        BarChart(context).apply {
-                            layoutParams = LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            // Style: Clean fintech look
-                            description.isEnabled = false
-                            legend.isEnabled = false
-                            setDrawGridBackground(false)
-                            setDrawBorders(false)
-                            setDrawValueAboveBar(true)
-                            setFitBars(true)
-                            setScaleEnabled(false)
-                            setPinchZoom(false)
-                            setBackgroundColor(AColor.TRANSPARENT)
-                            animateY(800)
-                            setExtraOffsets(8f, 16f, 8f, 8f)
-
-                            // Axis: Remove grid, keep bottom labels
-                            axisLeft.apply {
-                                setDrawGridLines(false)
-                                setDrawAxisLine(false)
-                                setDrawLabels(false)
-                            }
-                            axisRight.isEnabled = false
-                            xAxis.apply {
-                                position = XAxis.XAxisPosition.BOTTOM
-                                setDrawGridLines(false)
-                                setDrawAxisLine(false)
-                                granularity = 1f
-                                textColor = AColor.parseColor("#94A3B8")
-                                textSize = 11f
-                                valueFormatter = IndexAxisValueFormatter(state.weeklyDayNames)
-                            }
-
-                            // Highlight on tap
-                            isHighlightPerTapEnabled = true
-                            isHighlightPerDragEnabled = false
-
-                            // Data
-                            val entries = state.weeklyDayAmounts.mapIndexed { i, amt ->
-                                BarEntry(i.toFloat(), amt)
-                            }
-                            val dataSet = BarDataSet(entries, "Collections").apply {
-                                color = AColor.parseColor("#059669")
-                                valueTextColor = AColor.parseColor("#A7F3D0")
-                                valueTextSize = 10f
-                                valueFormatter = object : ValueFormatter() {
-                                    override fun getFormattedValue(value: Float): String {
-                                        return if (value > 0) "₹${String.format("%.0f", value)}" else ""
-                                    }
+            // ─── Collection Trend Chart ────────────────────────────────
+            SectionHeader(icon = Icons.Default.TrendingUp, label = "Collection Trend")
+            if (state.weeklyDayAmounts.isNotEmpty() && state.weeklyDayAmounts.sum() > 0f) {
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .padding(12.dp),
+                        factory = { ctx ->
+                            BarChart(ctx).apply {
+                                description.isEnabled = false
+                                legend.isEnabled = false
+                                setTouchEnabled(false)
+                                setDrawGridBackground(false)
+                                axisRight.isEnabled = false
+                                axisLeft.apply {
+                                    textColor = android.graphics.Color.parseColor("#94A3B8")
+                                    textSize = 10f
+                                    gridColor = android.graphics.Color.parseColor("#1F2937")
+                                    setDrawAxisLine(false)
                                 }
-                            }
-                            data = BarData(dataSet).apply {
-                                barWidth = 0.6f
-                            }
-                            invalidate()
-                        }
-                    },
-                    update = { chart ->
-                        val entries = state.weeklyDayAmounts.mapIndexed { i, amt ->
-                            BarEntry(i.toFloat(), amt)
-                        }
-                        val dataSet = BarDataSet(entries, "Collections").apply {
-                            color = AColor.parseColor("#059669")
-                            valueTextColor = AColor.parseColor("#A7F3D0")
-                            valueTextSize = 10f
-                            valueFormatter = object : ValueFormatter() {
-                                override fun getFormattedValue(value: Float): String {
-                                    return if (value > 0) "₹${String.format("%.0f", value)}" else ""
+                                xAxis.apply {
+                                    position = XAxis.XAxisPosition.BOTTOM
+                                    textColor = android.graphics.Color.parseColor("#94A3B8")
+                                    textSize = 9f
+                                    gridColor = android.graphics.Color.parseColor("#1F2937")
+                                    setDrawAxisLine(false)
+                                    granularity = 1f
                                 }
+                                setExtraOffsets(8f, 8f, 8f, 8f)
                             }
+                        },
+                        update = { chart ->
+                            val entries = state.weeklyDayAmounts.mapIndexed { idx, amount ->
+                                BarEntry(idx.toFloat(), amount)
+                            }
+                            chart.xAxis.valueFormatter = IndexAxisValueFormatter(state.weeklyDayNames)
+                            val dataSet = BarDataSet(entries, "").apply {
+                                color = android.graphics.Color.parseColor("#34D399")
+                                setDrawValues(false)
+                            }
+                            chart.data = BarData(dataSet).apply { barWidth = 0.5f }
+                            chart.invalidate()
                         }
-                        chart.data = BarData(dataSet).apply { barWidth = 0.6f }
-                        chart.xAxis.valueFormatter = IndexAxisValueFormatter(state.weeklyDayNames)
-                        chart.invalidate()
-                    }
-                )
-            }
-
-            // ═══════ PAYMENT MODES PIE CHART ═══════
-            val totalPayments = state.cashTotal + state.gpayTotal
-            ChartSection(title = "💳 Payment Modes") {
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp),
-                    factory = { context ->
-                        PieChart(context).apply {
-                            layoutParams = LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-
-                            // Donut style
-                            isDrawHoleEnabled = true
-                            holeRadius = 58f
-                            transparentCircleRadius = 62f
-                            setHoleColor(AColor.parseColor("#1A1F2E"))
-                            setTransparentCircleColor(AColor.parseColor("#1A1F2E"))
-                            setTransparentCircleAlpha(80)
-
-                            // Center text
-                            setDrawCenterText(true)
-                            centerText = "Total\n₹${String.format("%.0f", totalPayments)}"
-                            setCenterTextColor(AColor.WHITE)
-                            setCenterTextSize(16f)
-                            setCenterTextTypeface(Typeface.DEFAULT_BOLD)
-
-                            // Style
-                            description.isEnabled = false
-                            setDrawEntryLabels(false)
-                            setBackgroundColor(AColor.TRANSPARENT)
-                            animateY(800)
-
-                            // Legend
-                            legend.apply {
-                                isEnabled = true
-                                textColor = AColor.parseColor("#94A3B8")
-                                textSize = 13f
-                                formSize = 12f
-                                xEntrySpace = 20f
-                            }
-
-                            // Data
-                            val entries = mutableListOf<PieEntry>()
-                            if (state.cashTotal > 0) entries.add(PieEntry(state.cashTotal, "Cash"))
-                            if (state.gpayTotal > 0) entries.add(PieEntry(state.gpayTotal, "GPay"))
-                            if (entries.isEmpty()) entries.add(PieEntry(1f, "No Data"))
-
-                            val colors = mutableListOf<Int>()
-                            if (state.cashTotal > 0) colors.add(AColor.parseColor("#FFD700"))
-                            if (state.gpayTotal > 0) colors.add(AColor.parseColor("#059669"))
-                            if (colors.isEmpty()) colors.add(AColor.parseColor("#334155"))
-
-                            val dataSet = PieDataSet(entries, "").apply {
-                                this.colors = colors
-                                sliceSpace = 3f
-                                valueTextColor = AColor.WHITE
-                                valueTextSize = 14f
-                                valueFormatter = object : ValueFormatter() {
-                                    override fun getFormattedValue(value: Float): String {
-                                        return "₹${String.format("%.0f", value)}"
-                                    }
-                                }
-                            }
-                            data = PieData(dataSet)
-                            invalidate()
-                        }
-                    },
-                    update = { chart ->
-                        val entries = mutableListOf<PieEntry>()
-                        if (state.cashTotal > 0) entries.add(PieEntry(state.cashTotal, "Cash"))
-                        if (state.gpayTotal > 0) entries.add(PieEntry(state.gpayTotal, "GPay"))
-                        if (entries.isEmpty()) entries.add(PieEntry(1f, "No Data"))
-
-                        val colors = mutableListOf<Int>()
-                        if (state.cashTotal > 0) colors.add(AColor.parseColor("#FFD700"))
-                        if (state.gpayTotal > 0) colors.add(AColor.parseColor("#059669"))
-                        if (colors.isEmpty()) colors.add(AColor.parseColor("#334155"))
-
-                        val dataSet = PieDataSet(entries, "").apply {
-                            this.colors = colors
-                            sliceSpace = 3f
-                            valueTextColor = AColor.WHITE
-                            valueTextSize = 14f
-                            valueFormatter = object : ValueFormatter() {
-                                override fun getFormattedValue(value: Float): String {
-                                    return "₹${String.format("%.0f", value)}"
-                                }
-                            }
-                        }
-                        chart.centerText = "Total\n₹${String.format("%.0f", totalPayments)}"
-                        chart.data = PieData(dataSet)
-                        chart.invalidate()
-                    }
-                )
-            }
-
-            // ═══════ OVERDUE LIST ═══════
-            Text(
-                text = "⚠️ Overdue List",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error
-            )
-
-            if (state.overdueCustomers.isEmpty()) {
-                Text(
-                    text = "No overdue accounts. All settled!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextWhite.copy(alpha = 0.5f)
-                )
+                    )
+                }
             } else {
-                state.overdueCustomers.forEach { overdue ->
-                    com.emicollect.app.ui.components.GlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    overdue.customer.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextWhite,
-                                    fontWeight = FontWeight.Bold
+                EmptyStateView(
+                    icon = Icons.Default.BarChart,
+                    title = "No data yet",
+                    subtitle = "Collection trends for this period will appear here once recorded"
+                )
+            }
+
+            // ─── Cash vs GPay Pie ──────────────────────────────────────
+            SectionHeader(icon = Icons.Default.DonutLarge, label = "Payment Modes")
+            if (state.cashTotal > 0 || state.gpayTotal > 0) {
+                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        AndroidView(
+                            modifier = Modifier.size(140.dp),
+                            factory = { ctx ->
+                                PieChart(ctx).apply {
+                                    description.isEnabled = false
+                                    legend.isEnabled = false
+                                    setTouchEnabled(false)
+                                    isDrawHoleEnabled = true
+                                    holeRadius = 55f
+                                    transparentCircleRadius = 60f
+                                    setHoleColor(android.graphics.Color.TRANSPARENT)
+                                    setDrawEntryLabels(false)
+                                }
+                            },
+                            update = { chart ->
+                                val entries = listOf(
+                                    PieEntry(state.cashTotal, "Cash"),
+                                    PieEntry(state.gpayTotal, "GPay")
                                 )
-                                Text(
-                                    text = "Pending: ₹${String.format("%.2f", overdue.totalRemainingDebt)}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextWhite.copy(alpha = 0.7f)
-                                )
+                                val dataSet = PieDataSet(entries, "").apply {
+                                    colors = listOf(
+                                        android.graphics.Color.parseColor("#34D399"),
+                                        android.graphics.Color.parseColor("#3B82F6")
+                                    )
+                                    setDrawValues(false)
+                                }
+                                chart.data = PieData(dataSet)
+                                chart.invalidate()
                             }
-                            Column(horizontalAlignment = Alignment.End) {
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            LegendRow(
+                                color = EmeraldLight,
+                                label = "Cash",
+                                value = "₹${String.format("%.0f", state.cashTotal)}"
+                            )
+                            LegendRow(
+                                color = InfoBlue,
+                                label = "GPay",
+                                value = "₹${String.format("%.0f", state.gpayTotal)}"
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ─── Overdue List ──────────────────────────────────────────
+            if (state.overdueCustomers.isNotEmpty()) {
+                SectionHeader(icon = Icons.Default.WarningAmber, label = "Overdue Customers")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.overdueCustomers.forEach { item ->
+                        GlassCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.padding(14.dp).fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.customer.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    val daysText = if (item.lastPaymentDate != null) {
+                                        val days = ((System.currentTimeMillis() - item.lastPaymentDate) / (1000 * 60 * 60 * 24)).toInt()
+                                        "$days days since last payment"
+                                    } else {
+                                        "No payments recorded"
+                                    }
+                                    Text(
+                                        text = daysText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ErrorRed
+                                    )
+                                }
                                 Text(
-                                    text = "Overdue",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                val dateStr = overdue.lastPaymentDate?.let {
-                                    java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(it))
-                                } ?: "Never Paid"
-                                Text(
-                                    text = "Due since: $dateStr",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
+                                    text = "₹${String.format("%.0f", item.totalRemainingDebt)}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ErrorRed
                                 )
                             }
                         }
@@ -372,73 +355,64 @@ fun AnalyticsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
-// ═══ Glassmorphism Stat Card ═══
 @Composable
-private fun StatCard(
-    modifier: Modifier = Modifier,
+private fun AnalyticStatCard(
+    icon: ImageVector,
     label: String,
     value: String,
-    icon: ImageVector,
-    gradientColors: List<Color>
+    valueColor: Color,
+    modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.linearGradient(gradientColors)
-            )
-            .padding(14.dp)
-    ) {
-        Column {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 11.sp
-            )
+    GlassCard(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = valueColor.copy(alpha = 0.7f), modifier = Modifier.size(22.dp))
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
         }
     }
 }
 
-// ═══ Chart Section Wrapper ═══
 @Composable
-private fun ChartSection(
-    title: String,
-    content: @Composable () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF1A1F2E))
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+private fun SectionHeader(icon: ImageVector, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = TextWhite
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(18.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Brush.verticalGradient(listOf(EmeraldLight, EmeraldPrimary)))
         )
-        content()
+        Icon(icon, contentDescription = null, tint = EmeraldLight, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+    }
+}
+
+@Composable
+private fun LegendRow(color: Color, label: String, value: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(12.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(color)
+        )
+        Column {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }

@@ -146,6 +146,10 @@ class CustomerDetailViewModel @Inject constructor(
 
     fun addLoan(itemName: String, price: Double, downPayment: Double, startDate: Long = System.currentTimeMillis(), paymentMode: String = "Cash") {
         viewModelScope.launch {
+            if (price <= 0 || downPayment < 0 || downPayment > price) {
+                _uiState.update { it.copy(snackbarMessage = "Invalid loan: Down payment exceeds total price.") }
+                return@launch
+            }
             val loan = Loan(
                 customerId = customerId,
                 itemName = itemName,
@@ -173,6 +177,10 @@ class CustomerDetailViewModel @Inject constructor(
 
     fun processPayment(loanId: Long, amount: Double, paymentMode: String = "Cash", date: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
+            if (amount <= 0) {
+                _uiState.update { it.copy(snackbarMessage = "Payment must be greater than zero") }
+                return@launch
+            }
             try {
                 val loan = repository.getLoanById(loanId) ?: return@launch
                 // Cap payment at current balance — never go negative
@@ -286,15 +294,18 @@ class CustomerDetailViewModel @Inject constructor(
         return repository.getTransactionsForLoan(loanId)
     }
 
-    fun shareStatement(context: android.content.Context, isCombined: Boolean = true) {
+    fun shareStatement(context: android.content.Context, isCombined: Boolean = true, selectedLoanId: Long? = null, periodStart: Long? = null, periodEnd: Long? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 // Fetch all transactions for this customer
-                val transactions = repository.getTransactionsForCustomer(customerId).first()
+                val allTransactions = repository.getTransactionsForCustomer(customerId).first()
                 val customerWithLoans = _uiState.value.customerWithLoans
                 val customer = customerWithLoans?.customer
-                val loans = customerWithLoans?.loans ?: emptyList()
+                val allLoans = customerWithLoans?.loans ?: emptyList()
+                
+                val loans = if (!isCombined && selectedLoanId != null) allLoans.filter { it.loanId == selectedLoanId } else allLoans
+                val transactions = if (!isCombined && selectedLoanId != null) allTransactions.filter { it.loanId == selectedLoanId } else allTransactions
                 
                 // Calculate Totals
                 val totalPrincipal = loans.sumOf { it.totalPrincipal }
@@ -311,7 +322,9 @@ class CustomerDetailViewModel @Inject constructor(
                             transactions,
                             loans,
                             isCombined,
-                            businessName = businessName
+                            businessName = businessName,
+                            periodStart = periodStart,
+                            periodEnd = periodEnd
                         )
                     }
                     
@@ -332,3 +345,8 @@ class CustomerDetailViewModel @Inject constructor(
         }
     }
 }
+
+
+
+
+

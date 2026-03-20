@@ -14,7 +14,7 @@ import javax.inject.Singleton
 class GoogleAuthManager @Inject constructor() {
     
     // Replace with your actual OAuth Client ID
-    private val CLIENT_ID = "390398090935-cofso24v8ptf6mc6dtqbtro8epgfp0lm.apps.googleusercontent.com"
+    private val CLIENT_ID = "390398090935-epfv4gnihcu482t3n22k8ig7fvobpo9k.apps.googleusercontent.com"
 
     fun getSignInIntent(context: Context): Intent {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)

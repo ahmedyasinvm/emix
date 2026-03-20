@@ -115,7 +115,7 @@ class HomeViewModel @Inject constructor(
                     _uiEvent.emit(HomeUiEvent.RestartRequired)
                 }
             } catch (e: Exception) {
-                _uiEvent.emit(HomeUiEvent.ShowMessage("Restore failed: ${e.message}"))
+                _uiEvent.emit(HomeUiEvent.ShowMessage("Restore failed: ${e.toString()}"))
             } finally {
                 _uiState.update { it.copy(isLoading = false) }
             }
@@ -238,3 +238,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 }
+
+
+
+

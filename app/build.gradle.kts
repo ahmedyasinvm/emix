@@ -15,8 +15,8 @@ android {
         applicationId = "com.emicollect.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "3.0.5"
+        versionCode = 7
+        versionName = "4.6.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

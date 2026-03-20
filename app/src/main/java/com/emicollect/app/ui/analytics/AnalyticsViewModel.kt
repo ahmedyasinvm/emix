@@ -16,13 +16,12 @@ import javax.inject.Inject
 enum class DateRange(val label: String, val days: Int) {
     WEEK("Week", 7),
     DAYS_30("30 Days", 30),
-    DAYS_90("90 Days", 90)
+    DAYS_90("90 Days", 90),
+    CUSTOM("Custom", -1)
 }
 
 /** Intermediate data holder to preserve types in combine transforms. */
 private data class RawAnalyticsData(
-    val totalCollected: Double,
-    val todayCollected: Double,
     val overdueCount: Int,
     val customers: List<Customer>,
     val loans: List<Loan>,
@@ -38,19 +37,23 @@ class AnalyticsViewModel @Inject constructor(
     private val _selectedRange = MutableStateFlow(DateRange.WEEK)
     val selectedRange: StateFlow<DateRange> = _selectedRange.asStateFlow()
 
+    private val _customDateRange = MutableStateFlow<Pair<Long, Long>?>(null)
+    val customDateRange: StateFlow<Pair<Long, Long>?> = _customDateRange.asStateFlow()
+
     fun setDateRange(range: DateRange) { _selectedRange.value = range }
+    
+    fun setCustomDateRange(start: Long, end: Long) {
+        _customDateRange.value = start to end
+        _selectedRange.value = DateRange.CUSTOM
+    }
 
     /** Combine all source flows into a single typed raw data object first. */
     private val rawData: Flow<RawAnalyticsData> = combine(
-        repository.getTotalCollection(),
-        repository.getCollectedToday(),
         repository.countOverdueLoans(System.currentTimeMillis()),
         repository.getAllCustomers(),
         repository.getAllLoans()
-    ) { total, today, overdueCount, customers, loans ->
+    ) { overdueCount, customers, loans ->
         RawAnalyticsData(
-            totalCollected = total,
-            todayCollected = today,
             overdueCount = overdueCount,
             customers = customers,
             loans = loans,
@@ -61,72 +64,112 @@ class AnalyticsViewModel @Inject constructor(
     }
 
     val uiState: StateFlow<AnalyticsUiState> = rawData
-        .combine(_selectedRange) { d, range ->
-            buildUiState(d, range)
+        .combine(_selectedRange) { d, range -> d to range }
+        .combine(_customDateRange) { (d, range), customRange ->
+            buildUiState(d, range, customRange)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = AnalyticsUiState(isLoading = true)
         )
 
-    private fun buildUiState(d: RawAnalyticsData, range: DateRange): AnalyticsUiState {
+    private fun buildUiState(d: RawAnalyticsData, range: DateRange, customRange: Pair<Long, Long>?): AnalyticsUiState {
         val chartLabels = mutableListOf<String>()
         val chartAmounts = mutableListOf<Float>()
 
+        // 1. Determine period bounds for filtering total collected
+        val (periodStart, periodEnd) = when (range) {
+            DateRange.WEEK -> {
+                val cal = Calendar.getInstance()
+                val end = cal.timeInMillis
+                cal.add(Calendar.DAY_OF_YEAR, -7)
+                cal.timeInMillis to end
+            }
+            DateRange.DAYS_30 -> {
+                val cal = Calendar.getInstance()
+                val end = cal.timeInMillis
+                cal.add(Calendar.DAY_OF_YEAR, -30)
+                cal.timeInMillis to end
+            }
+            DateRange.DAYS_90 -> {
+                val cal = Calendar.getInstance()
+                val end = cal.timeInMillis
+                cal.add(Calendar.DAY_OF_YEAR, -90)
+                cal.timeInMillis to end
+            }
+            DateRange.CUSTOM -> {
+                customRange ?: (0L to System.currentTimeMillis())
+            }
+        }
+
+        // 2. Filter transactions for the selected period
+        val periodTransactions = d.transactions.filter { it.datePaid in periodStart..periodEnd }
+        val periodCollected = periodTransactions.sumOf { it.amountPaid }
+
+        val cashTotal = periodTransactions.filter { it.paymentMode.equals("Cash", ignoreCase = true) }.sumOf { it.amountPaid }
+        val gpayTotal = periodTransactions.filter { it.paymentMode.equals("GPay", ignoreCase = true) }.sumOf { it.amountPaid }
+
+        // 3. Build Chart Data
         when (range) {
             DateRange.WEEK -> {
                 val dayFormatter = java.text.SimpleDateFormat("EEE", Locale.getDefault())
                 for (i in 6 downTo 0) {
-                    val dayCal = Calendar.getInstance()
-                    dayCal.add(Calendar.DAY_OF_YEAR, -i)
-                    dayCal.set(Calendar.HOUR_OF_DAY, 0); dayCal.set(Calendar.MINUTE, 0)
-                    dayCal.set(Calendar.SECOND, 0); dayCal.set(Calendar.MILLISECOND, 0)
-                    val dayStart = dayCal.timeInMillis
-                    dayCal.set(Calendar.HOUR_OF_DAY, 23); dayCal.set(Calendar.MINUTE, 59)
-                    dayCal.set(Calendar.SECOND, 59); dayCal.set(Calendar.MILLISECOND, 999)
-                    val dayEnd = dayCal.timeInMillis
-
-                    val dayTotal = d.transactions.filter { txn ->
-                        txn.datePaid in dayStart..dayEnd
-                    }.sumOf { it.amountPaid }
+                    val dayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -i) }
+                    val startOfDay = dayCal.apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+                    val endOfDay = dayCal.apply { set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999) }.timeInMillis
+                    
+                    val dayTotal = d.transactions.filter { it.datePaid in startOfDay..endOfDay }.sumOf { it.amountPaid }
                     chartLabels.add(dayFormatter.format(dayCal.time))
                     chartAmounts.add(dayTotal.toFloat())
                 }
             }
-
             DateRange.DAYS_30, DateRange.DAYS_90 -> {
                 val weeks = range.days / 7
                 val weekFormatter = java.text.SimpleDateFormat("d MMM", Locale.getDefault())
                 for (w in weeks - 1 downTo 0) {
-                    val endCal = Calendar.getInstance()
-                    endCal.add(Calendar.DAY_OF_YEAR, -(w * 7))
-                    endCal.set(Calendar.HOUR_OF_DAY, 23); endCal.set(Calendar.MINUTE, 59)
-                    endCal.set(Calendar.SECOND, 59); endCal.set(Calendar.MILLISECOND, 999)
-                    val weekEnd = endCal.timeInMillis
+                    val endCal = Calendar.getInstance().apply { 
+                        add(Calendar.DAY_OF_YEAR, -(w * 7))
+                        set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59)
+                    }.timeInMillis
+                    val startCal = Calendar.getInstance().apply { 
+                        add(Calendar.DAY_OF_YEAR, -(w * 7 + 6))
+                        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
+                    }.timeInMillis
 
-                    val startCal = Calendar.getInstance()
-                    startCal.add(Calendar.DAY_OF_YEAR, -(w * 7 + 6))
-                    startCal.set(Calendar.HOUR_OF_DAY, 0); startCal.set(Calendar.MINUTE, 0)
-                    startCal.set(Calendar.SECOND, 0); startCal.set(Calendar.MILLISECOND, 0)
-                    val weekStart = startCal.timeInMillis
-
-                    val weekTotal = d.transactions.filter { txn ->
-                        txn.datePaid in weekStart..weekEnd
-                    }.sumOf { it.amountPaid }
-                    chartLabels.add(weekFormatter.format(java.util.Date(weekStart)))
+                    val weekTotal = d.transactions.filter { it.datePaid in startCal..endCal }.sumOf { it.amountPaid }
+                    chartLabels.add(weekFormatter.format(java.util.Date(startCal)))
                     chartAmounts.add(weekTotal.toFloat())
+                }
+            }
+            DateRange.CUSTOM -> {
+                // Determine step size based on duration
+                val durationDays = ((periodEnd - periodStart) / (1000 * 60 * 60 * 24)).toInt()
+                if (durationDays <= 14) {
+                    val dayFormatter = java.text.SimpleDateFormat("dd MMM", Locale.getDefault())
+                    for (i in 0..durationDays) {
+                        val startOfDay = periodStart + (i * 24 * 60 * 60 * 1000L)
+                        val endOfDay = startOfDay + (24 * 60 * 60 * 1000L) - 1
+                        val dayTotal = d.transactions.filter { it.datePaid in startOfDay..endOfDay }.sumOf { it.amountPaid }
+                        chartLabels.add(dayFormatter.format(java.util.Date(startOfDay)))
+                        chartAmounts.add(dayTotal.toFloat())
+                    }
+                } else {
+                    // Just aggregate the custom range as a single block for simplicity or chunks of 7 days
+                    val chunks = maxOf(1, durationDays / 7)
+                    val chunkMillis = (periodEnd - periodStart) / chunks
+                    val formatter = java.text.SimpleDateFormat("dd MMM", Locale.getDefault())
+                    for (i in 0 until chunks) {
+                        val cs = periodStart + (i * chunkMillis)
+                        val ce = if (i == chunks - 1) periodEnd else cs + chunkMillis - 1
+                        val total = d.transactions.filter { it.datePaid in cs..ce }.sumOf { it.amountPaid }
+                        chartLabels.add(formatter.format(java.util.Date(cs)))
+                        chartAmounts.add(total.toFloat())
+                    }
                 }
             }
         }
 
-        val cashTotal = d.transactions.filter { it.paymentMode.equals("Cash", ignoreCase = true) }.sumOf { it.amountPaid }
-        val gpayTotal = d.transactions.filter { it.paymentMode.equals("GPay", ignoreCase = true) }.sumOf { it.amountPaid }
-
-        val weekCal = Calendar.getInstance()
-        weekCal.add(Calendar.DAY_OF_YEAR, -7)
-        weekCal.set(Calendar.HOUR_OF_DAY, 0); weekCal.set(Calendar.MINUTE, 0); weekCal.set(Calendar.SECOND, 0)
-        val weekStart = weekCal.timeInMillis
-        val weekCollected = d.transactions.filter { it.datePaid >= weekStart }.sumOf { it.amountPaid }
+        // Outstanding & Overdue logic remains all-time globally
         val totalOutstanding = d.loans.filter { !it.isClosed }.sumOf { it.currentBalance }
 
         val loansByCustomer = d.loans.groupBy { it.customerId }
@@ -140,10 +183,13 @@ class AnalyticsViewModel @Inject constructor(
             if (isOverdue) OverdueCustomer(customer, activeLoans.sumOf { it.currentBalance }, lastPaymentDate) else null
         }.sortedByDescending { it.totalRemainingDebt }
 
+        // Today collected (always today, regardless of filter)
+        val todayStart = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
+        val todayCollected = d.transactions.filter { it.datePaid >= todayStart }.sumOf { it.amountPaid }
+
         return AnalyticsUiState(
-            totalCollected = d.totalCollected,
-            todayCollected = d.todayCollected,
-            weekCollected = weekCollected,
+            periodCollected = periodCollected,
+            todayCollected = todayCollected,
             totalOutstanding = totalOutstanding,
             overdueCount = d.overdueCount,
             overdueCustomers = overdueList,
@@ -163,9 +209,8 @@ data class OverdueCustomer(
 )
 
 data class AnalyticsUiState(
-    val totalCollected: Double = 0.0,
+    val periodCollected: Double = 0.0,
     val todayCollected: Double = 0.0,
-    val weekCollected: Double = 0.0,
     val totalOutstanding: Double = 0.0,
     val overdueCount: Int = 0,
     val overdueCustomers: List<OverdueCustomer> = emptyList(),

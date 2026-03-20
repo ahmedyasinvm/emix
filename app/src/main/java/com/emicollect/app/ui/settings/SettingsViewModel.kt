@@ -161,7 +161,7 @@ class SettingsViewModel @Inject constructor(
                     _snackbarMessage.emit("Backup upload failed. Please try again.")
                 }
             } catch (e: Exception) {
-                _snackbarMessage.emit("Backup failed: ${e.message}")
+                _snackbarMessage.emit("Backup failed: ${e.toString()}")
                 e.printStackTrace()
             }
         }
@@ -188,7 +188,7 @@ class SettingsViewModel @Inject constructor(
                 driveServiceHelper.downloadBackup(context, account, latest.id)
                 _snackbarMessage.emit("RESTART_NEEDED")
             } catch (e: Exception) {
-                _snackbarMessage.emit("Restore failed: ${e.message}")
+                _snackbarMessage.emit("Restore failed: ${e.toString()}")
                 e.printStackTrace()
             }
         }
@@ -328,3 +328,8 @@ class SettingsViewModel @Inject constructor(
         }
     }
 }
+
+
+
+
+

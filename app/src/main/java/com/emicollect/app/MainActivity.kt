@@ -5,17 +5,21 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -27,10 +31,7 @@ import androidx.navigation.navArgument
 import com.emicollect.app.data.local.UserPreferencesRepository
 import com.emicollect.app.ui.addcustomer.AddCustomerScreen
 import com.emicollect.app.ui.details.CustomerDetailScreen
-import com.emicollect.app.ui.theme.EMICollectAppTheme
-import com.emicollect.app.ui.theme.EmeraldPrimary
-import com.emicollect.app.ui.theme.GoldAccent
-import com.emicollect.app.ui.theme.TextWhite
+import com.emicollect.app.ui.theme.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -45,19 +46,14 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Show a loading/splash screen immediately while we read the preference
         showLockScreen()
-
-
 
         lifecycleScope.launch {
             val isBiometricEnabled = userPreferencesRepository.isBiometricEnabled.first()
 
             if (!isBiometricEnabled) {
-                // Biometric NOT enabled — go straight to app
                 showAppContent()
             } else {
-                // Biometric IS enabled — check hardware, then prompt
                 runOnUiThread { startBiometricAuth() }
             }
         }
@@ -71,7 +67,6 @@ class MainActivity : FragmentActivity() {
         )
 
         if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
-            // Hardware not available or no fingerprint enrolled — let them in
             showAppContent()
             return
         }
@@ -88,7 +83,6 @@ class MainActivity : FragmentActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    // User tapped "Cancel" or too many attempts → close app
                     Toast.makeText(this@MainActivity, "Authentication cancelled", Toast.LENGTH_SHORT).show()
                     finish()
                 }
@@ -100,7 +94,6 @@ class MainActivity : FragmentActivity() {
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    // Single bad attempt — prompt stays open, just toast
                     Toast.makeText(this@MainActivity, "Fingerprint not recognised", Toast.LENGTH_SHORT).show()
                 }
             })
@@ -108,32 +101,79 @@ class MainActivity : FragmentActivity() {
         biometricPrompt.authenticate(promptInfo)
     }
 
-    /** Temporary lock/splash screen — shown until biometric check completes */
+    /** Animated premium lock/splash screen */
     private fun showLockScreen() {
         setContent {
-            // Default to dark for splash
             EMICollectAppTheme(useDarkTheme = true) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    GunmetalLight,
+                                    GunmetalDark
+                                ),
+                                radius = 800f
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Pulsing ring
+                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                    val ringScale by infiniteTransition.animateFloat(
+                        initialValue = 0.85f,
+                        targetValue = 1.15f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = EaseInOutCubic),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "ring_scale"
+                    )
+                    val ringAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.4f,
+                        targetValue = 0.1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = EaseInOutCubic),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "ring_alpha"
+                    )
+
+                    // Outer pulsing ring
+                    Box(
+                        modifier = Modifier
+                            .size(140.dp)
+                            .scale(ringScale)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        EmeraldLight.copy(alpha = ringAlpha),
+                                        EmeraldPrimary.copy(alpha = 0f)
+                                    )
+                                ),
+                                CircleShape
+                            )
+                    )
+
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "EMIX",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = GoldAccent
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 4.sp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(GoldAccent, GoldLight)
+                                )
+                            )
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "EMI Collection Manager",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextWhite.copy(alpha = 0.6f)
+                            color = TextWhite.copy(alpha = 0.5f),
+                            letterSpacing = 2.sp
                         )
-                        Spacer(modifier = Modifier.height(32.dp))
-                        CircularProgressIndicator(color = EmeraldPrimary, modifier = Modifier.size(32.dp))
                     }
                 }
             }
@@ -144,7 +184,7 @@ class MainActivity : FragmentActivity() {
     private fun showAppContent() {
         setContent {
             val isDarkMode by userPreferencesRepository.isDarkMode.collectAsState(initial = true)
-            
+
             EMICollectAppTheme(useDarkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
