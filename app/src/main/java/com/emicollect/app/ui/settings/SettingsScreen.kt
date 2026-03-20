@@ -282,7 +282,7 @@ fun SettingsScreen(
                     label = "Privacy Policy",
                     color = InfoBlue,
                     onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://emicollect.com/privacy-policy"))
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://ahmedyasinvm.site/privacy.html"))
                         context.startActivity(intent)
                     },
                     modifier = Modifier.fillMaxWidth()
