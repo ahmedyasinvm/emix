@@ -1,8 +1,8 @@
 # 🏦 Emix - Premium EMI Collection Manager
 
-![Version](https://img.shields.io/badge/Version-3.2-gold) ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-purple) ![Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-green) ![Architecture](https://img.shields.io/badge/Architecture-MVVM%20%2B%20Hilt-blue)
+![Version](https://img.shields.io/badge/Version-4.6.5-gold) ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-purple) ![Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-green) ![Architecture](https://img.shields.io/badge/Architecture-MVVM%20%2B%20Hilt-blue)
 
-**Emix** is a professional-grade EMI loan collection tool built for field agents and small lenders. It features a **Finance Premium Dark Theme** (Emerald & Gold), real-time analytics, cloud backup via Google Drive, and smart receipt generation — all offline-first.
+**Emix** is a professional-grade EMI loan collection tool built for field agents and small lenders. It features a complete **Finance Premium Dark Theme** (Emerald & Gold), real-time analytics, cloud backup via Google Drive, and smart receipt generation — all offline-first.
 
 ## 📥 Download
 
@@ -10,63 +10,58 @@ Get the latest APK from the **[Releases Page](https://github.com/ahmedyasinvm/em
 
 ---
 
-## ✨ What's New in v3.2
+## ✨ What's New in v4.6.5 (The Premium Overhaul)
 
-- **Restore-First Safety Protocol** — After sign-in, if a cloud backup exists and the local database is empty, the app prompts to restore before doing any backup (prevents data loss)
-- **Edit & Delete Customers/Loans** — Full CRUD from the Customer Detail screen with confirmation dialogs
-- **Loan Progress Bar** — Each loan card now shows a repayment progress bar and a **"Settled"** badge when fully paid
-- **Over-Budget Payment Warning** — SmartPaymentDialog warns and relabels the button when the entered amount exceeds the remaining balance
-- **Today's Due Filter** — Dashboard quick action to instantly filter only overdue/due-today customers
-- **Analytics Date Range** — Switch the collections chart between **Last 7 Days**, **30 Days**, and **90 Days**
-- **Professional Codebase** — Removed informal Toast/emoji feedback; all UI events go through `UiEvent` SharedFlow
+- **Finance Premium Dark Theme** — 60+ new design tokens, glassmorphism cards with gradient borders, and animated screen transitions.
+- **Custom Date Range Analytics** — Dynamically filter charts, collection stats, and period summaries using the new `Custom` date picker.
+- **Enhanced Statement Sharing** — Modern bottom sheet UI to share Full (All Loans) or Itemized (Specific Loan) statements with custom date bounds.
+- **Premium Receipt Overhaul** — Generated statements now feature stunning gradient headers, faint watermarks, and beautiful tabular rows to match the app's aesthetic.
+- **Improved Logical Validation** — Smart UI bounds prevent irrational transactions, over-budget down payments, and negative accounting loops.
+- **Settings Enhancements** — Grouped glass card sections, Privacy Policy integration, and clearer Cloud Backup states.
+
+*(Includes all robust features from v3.2 like the Restore-First Safety Protocol and CRUD confirmations).*
 
 ---
 
 ## ✨ Core Features
 
 ### 📊 Dashboard
-
 - Real-time stats: Today's Collection, Pending Dues, Active Loans
 - **Today's Due** filter — one tap to see only customers due today
 - **Today's Progress** quick action with collected amount and due count
 - Sort by: Urgent First, Highest Debt, Name A-Z
-- Glassmorphic dark UI with Emerald & Gold palette
+- Glassmorphic dark UI with animated scale transitions
 
 ### 👤 Customer Management
-
 - Add, **Edit**, and **Delete** customers with confirmation
 - Master Ledger per customer — full chronological payment history
 - FIFO total payment across all active loans
+- Clean Circular avatars with deterministic gradients and urgency indicators
 
 ### 💳 Loan Management
-
 - Add multiple loans per customer (item, price, down payment, schedule)
 - Per-loan repayment **progress bar**
 - Automatic **"Settled"** badge on fully paid loans
-- **Delete Loan** with single confirmation
+- Safe input validation against excess down-payments
 
 ### 💰 Smart Payment Processing
-
 - Cash / GPay toggle
 - Pre-filled default amount stepper
 - **Over-budget warning** when amount > remaining balance
-- Edit past transactions inline
 
 ### 🧾 Receipt & Statement Generation
-
-- Instant branded receipt (JPEG) — shareable via WhatsApp/Telegram
-- Combined customer statement with full ledger table
+- Premium branded receipt (PNG) — shareable via WhatsApp/Telegram
+- Combined or itemized customer statements with beautiful header gradients, watermarks, and alternate row colors.
+- Custom Date selection directly from the Share bottom sheet.
 
 ### ☁️ Cloud Backup & Restore (Google Drive)
-
 - One-tap backup to `Emix_Backups/` folder in Drive
 - **Restore-First protocol** — protects against accidental overwrite
 - Daily auto-backup via WorkManager
 - Local JSON backup/restore + Excel export
 
 ### 📈 Analytics
-
-- Collections bar chart with **Week / 30 Days / 90 Days** range selector
+- Collections bar chart with **Last 7 / 30 / 90 Days** and **Custom Range** selector
 - Cash vs GPay payment split pie chart
 - Overdue customers list with last payment date
 
@@ -90,6 +85,8 @@ Get the latest APK from the **[Releases Page](https://github.com/ahmedyasinvm/em
 ---
 
 ## 📱 Screenshots
+
+> *Screenshots are currently reflecting earlier versions. Premium Dark Mode UI screenshots coming soon!*
 
 |                                                Dashboard                                                |                                                Smart Pay                                                |                                                Analytics                                                |
 | :-----------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------: |
